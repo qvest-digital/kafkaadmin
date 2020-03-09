@@ -1,7 +1,14 @@
 package kafkaadmin
 
+import (
+	"github.com/fvosberg/errtypes"
+	"github.com/segmentio/kafka-go"
+	"context"
+	"fmt"
+	"time"
+)
+
 func EnsureTopicExists(ctx context.Context, zookeeperURL, kafkaURL, name string) error {
-	// TODO config of the topic
 	for {
 		err := ensureTopicExists(zookeeperURL, kafkaURL, name, 32)
 		if err == nil || ctx.Err() != nil {
@@ -62,3 +69,30 @@ func waitForTopicExists(kafkaURL, name string) error {
 	}
 	return errtypes.NewNotFound("topic doesn't exist")
 }
+
+func hasTopic(kafkaURL, name string) error {
+	dialer := &kafka.Dialer{
+		Timeout:   3 * time.Second,
+		DualStack: true, // IPv4 and IPv6
+	}
+	conn, err := dialer.Dial("tcp", kafkaURL)
+	if err != nil {
+		return err
+	}
+	partitions, err := conn.ReadPartitions(name)
+	if isUnknownTopicOrPartitionError(err) {
+		return errtypes.NewNotFoundf("not found: %s", err)
+	} else if err != nil {
+		return fmt.Errorf("reading partitions for topic creation verification failed: %w", err)
+	}
+	if len(partitions) == 0 {
+		return errtypes.NewNotFound("topic doesn't exist")
+	}
+	return nil
+}
+
+func isUnknownTopicOrPartitionError(err error) bool {
+	v, ok := err.(kafka.Error)
+	return ok && v == kafka.UnknownTopicOrPartition
+}
+

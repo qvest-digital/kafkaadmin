@@ -10,11 +10,27 @@ partitions, as this is a sane default for our platform.
 
 ## Usage
 
+In order to be able to fetch this library, you have to configure your machine,
+because this lib is fetched from a private repository.
+
+// TODO
+1. add .gitconfig for translating https to git/ssh
+
+And Gitlab
+
+// TODO
+
+In code you can use it like this:
+
 ```
 err := kafkaadmin.EnsureTopicExists(ctx, zookeeperURL, kafkaURL, topicName)
 if err != nil {
 	return fmt.Errorf("ensuring topic %q failed: %w", topicName, err)
 }
 ```
+
+## Development
+
+// TODO vendoring
 
 Made with ♥ by Team Hasselhoff

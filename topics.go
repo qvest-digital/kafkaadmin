@@ -1,10 +1,10 @@
 package kafkaadmin
 
 import (
-	"github.com/fvosberg/errtypes"
-	"github.com/segmentio/kafka-go"
 	"context"
 	"fmt"
+	"github.com/fvosberg/errtypes"
+	"github.com/segmentio/kafka-go"
 	"time"
 )
 
@@ -95,4 +95,3 @@ func isUnknownTopicOrPartitionError(err error) bool {
 	v, ok := err.(kafka.Error)
 	return ok && v == kafka.UnknownTopicOrPartition
 }
-

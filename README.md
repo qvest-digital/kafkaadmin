@@ -10,15 +10,12 @@ partitions, as this is a sane default for our platform.
 
 ## Usage
 
-In order to be able to fetch this library, you have to configure your machine,
-because this lib is fetched from a private repository.
+Because of the protected setup of the Bank11 it is quite tedious to use private
+libs. We solve this problem for now by using GIT submodules.
 
-// TODO
-1. add .gitconfig for translating https to git/ssh
-
-And Gitlab
-
-// TODO
+```
+git submodule add https://b11pgitlab.bankelf.de/smive/kafkaadmin.git ./internal/kafkaadmin
+```
 
 In code you can use it like this:
 
@@ -28,9 +25,5 @@ if err != nil {
 	return fmt.Errorf("ensuring topic %q failed: %w", topicName, err)
 }
 ```
-
-## Development
-
-// TODO vendoring
 
 Made with ♥ by Team Hasselhoff

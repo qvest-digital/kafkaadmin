@@ -8,6 +8,10 @@ import (
 	"time"
 )
 
+// EnsureTopicExists checks if the topic with the given name is missing
+// if it doesn't exist, it creates it with the default configuration
+// The configuration can't be altered currently, because we want to avoid conflicts
+// by different services creating the same topic
 func EnsureTopicExists(ctx context.Context, zookeeperURL, kafkaURL, name string) error {
 	for {
 		err := ensureTopicExists(zookeeperURL, kafkaURL, name, 32)

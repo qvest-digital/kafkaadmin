@@ -13,6 +13,8 @@ partitions, as this is a sane default for our platform.
 Because of the protected setup of the Bank11 it is quite tedious to use private
 libs. We solve this problem for now by using GIT submodules.
 
+### Add to Project
+
 ```
 git submodule add https://b11pgitlab.bankelf.de/smive/kafkaadmin.git ./internal/kafkaadmin
 ```
@@ -25,5 +27,20 @@ if err != nil {
 	return fmt.Errorf("ensuring topic %q failed: %w", topicName, err)
 }
 ```
+
+### Clone / Update a Project with Submodules
+
+If you clone a project using submodules for the first time, add a ```--recursive``` to the git command, e.g.
+
+    git clone --recursive https://b11pgitlab.bankelf.de:4443/smive/offer-manager.git
+
+If you already have a copy of the project (and the submodules have not been checked out yet), use
+
+    git submodule init
+    git submodule update
+
+To get the latest changes of all submodules use
+
+    git submodule update
 
 Made with ♥ by Team Hasselhoff

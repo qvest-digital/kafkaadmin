@@ -34,7 +34,7 @@ func ensureTopicExists(kafkaURL, name string, numPartitions int) error {
 		return fmt.Errorf("topic existence check failed: %w", err)
 	}
 
-	conn.createTopic(name, numPartitions)
+	err = conn.createTopic(name, numPartitions)
 	if err != nil {
 		return fmt.Errorf("creation of topic failed: %w", err)
 	}

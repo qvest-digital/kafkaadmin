@@ -3,57 +3,43 @@ package kafkaadmin
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/fvosberg/errtypes"
 	"github.com/segmentio/kafka-go"
-	"time"
 )
 
 // EnsureTopicExists checks if the topic with the given name is missing
 // if it doesn't exist, it creates it with the default configuration
 // The configuration can't be altered currently, because we want to avoid conflicts
 // by different services creating the same topic
-func EnsureTopicExists(ctx context.Context, zookeeperURL, kafkaURL, name string) error {
+func EnsureTopicExists(ctx context.Context, kafkaURL, name string) error {
 	for {
-		err := ensureTopicExists(zookeeperURL, kafkaURL, name, 32)
+		err := ensureTopicExists(kafkaURL, name, 32)
 		if err == nil || ctx.Err() != nil {
 			return err
 		}
 	}
 }
 
-func ensureTopicExists(zookeeperURL, kafkaURL, name string, numPartitions int) error {
-	dialer := &kafka.Dialer{
-		Timeout:   3 * time.Second,
-		DualStack: true, // IPv4 and IPv6
-	}
-	conn, err := dialer.Dial("tcp", kafkaURL)
+func ensureTopicExists(kafkaURL, name string, numPartitions int) error {
+	conn, err := open(kafkaURL)
 	if err != nil {
-		return err
+		return fmt.Errorf("connection to Kafka failed: %w", err)
 	}
-	err = hasTopic(kafkaURL, name)
-
-	if err != nil && !errtypes.IsNotFound(err) {
+	err = conn.hasTopic(name)
+	if err == nil {
+		return nil
+	} else if err != nil && !errtypes.IsNotFound(err) {
 		return fmt.Errorf("topic existence check failed: %w", err)
 	}
 
-	dialer = &kafka.Dialer{
-		Timeout:   3 * time.Second,
-		DualStack: true, // IPv4 and IPv6
-	}
-	conn, err = dialer.Dial("tcp", kafkaURL)
-	if err != nil {
-		return err
-	}
-	err = conn.CreateTopics(kafka.TopicConfig{
-		Topic:             name,
-		ReplicationFactor: 3,
-		NumPartitions:     numPartitions,
-	})
+	err = conn.createTopic(name, numPartitions)
 	if err != nil {
 		return fmt.Errorf("creation of topic failed: %w", err)
 	}
 
-	err = waitForTopicExists(kafkaURL, name)
+	err = conn.waitForTopicExists(name)
 	if err != nil {
 		return fmt.Errorf("waiting for topic creation failed: %w", err)
 	}
@@ -61,29 +47,24 @@ func ensureTopicExists(zookeeperURL, kafkaURL, name string, numPartitions int) e
 	return nil
 }
 
-func waitForTopicExists(kafkaURL, name string) error {
-	for retries := 100; retries > 0; retries-- {
-		err := hasTopic(kafkaURL, name)
-		if !errtypes.IsNotFound(err) && err != nil {
-			return fmt.Errorf("topic check failed: %w", err)
-		} else if err == nil {
-			return nil
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	return errtypes.NewNotFound("topic doesn't exist")
+type conn struct {
+	conn *kafka.Conn
 }
 
-func hasTopic(kafkaURL, name string) error {
+func open(kafkaURL string) (*conn, error) {
 	dialer := &kafka.Dialer{
 		Timeout:   3 * time.Second,
 		DualStack: true, // IPv4 and IPv6
 	}
-	conn, err := dialer.Dial("tcp", kafkaURL)
+	c, err := dialer.Dial("tcp", kafkaURL)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	partitions, err := conn.ReadPartitions(name)
+	return &conn{c}, nil
+}
+
+func (c *conn) hasTopic(name string) error {
+	partitions, err := c.conn.ReadPartitions(name)
 	if isUnknownTopicOrPartitionError(err) {
 		return errtypes.NewNotFoundf("not found: %s", err)
 	} else if err != nil {
@@ -93,6 +74,33 @@ func hasTopic(kafkaURL, name string) error {
 		return errtypes.NewNotFound("topic doesn't exist")
 	}
 	return nil
+}
+
+func (c *conn) createTopic(name string, numPartitions int) error {
+	return c.conn.CreateTopics(kafka.TopicConfig{
+		Topic:             name,
+		ReplicationFactor: 3,
+		NumPartitions:     numPartitions,
+		ConfigEntries: []kafka.ConfigEntry{
+			{
+				ConfigName:  "cleanup.policy",
+				ConfigValue: "compact",
+			},
+		},
+	})
+}
+
+func (c *conn) waitForTopicExists(name string) error {
+	for retries := 100; retries > 0; retries-- {
+		err := c.hasTopic(name)
+		if !errtypes.IsNotFound(err) && err != nil {
+			return fmt.Errorf("topic check failed: %w", err)
+		} else if err == nil {
+			return nil
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return errtypes.NewNotFound("topic doesn't exist")
 }
 
 func isUnknownTopicOrPartitionError(err error) bool {

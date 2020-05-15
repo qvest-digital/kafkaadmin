@@ -2,7 +2,9 @@ package kafkaadmin
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"github.com/aws/aws-sdk-go/service/kafka"
 	"time"
 
 	"github.com/fvosberg/errtypes"
@@ -13,17 +15,17 @@ import (
 // if it doesn't exist, it creates it with the default configuration
 // The configuration can't be altered currently, because we want to avoid conflicts
 // by different services creating the same topic
-func EnsureTopicExists(ctx context.Context, kafkaURL, name string) error {
+func EnsureTopicExists(ctx context.Context, kafkaURL string, tlsConfig *tls.Config, name string) error {
 	for {
-		err := ensureTopicExists(kafkaURL, name, 32)
+		err := ensureTopicExists(kafkaURL, tlsConfig, name, 32)
 		if err == nil || ctx.Err() != nil {
 			return err
 		}
 	}
 }
 
-func ensureTopicExists(kafkaURL, name string, numPartitions int) error {
-	conn, err := open(kafkaURL)
+func ensureTopicExists(kafkaURL string, tlsConfig *tls.Config, name string, numPartitions int) error {
+	conn, err := open(kafkaURL, tlsConfig)
 	if err != nil {
 		return fmt.Errorf("connection to Kafka failed: %w", err)
 	}
@@ -51,10 +53,11 @@ type conn struct {
 	conn *kafka.Conn
 }
 
-func open(kafkaURL string) (*conn, error) {
+func open(kafkaURL string, tlsConfig *tls.Config) (*conn, error) {
 	dialer := &kafka.Dialer{
 		Timeout:   3 * time.Second,
 		DualStack: true, // IPv4 and IPv6
+		TLS: tlsConfig,
 	}
 	c, err := dialer.Dial("tcp", kafkaURL)
 	if err != nil {

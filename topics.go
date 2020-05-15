@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/aws/aws-sdk-go/service/kafka"
 	"time"
 
 	"github.com/fvosberg/errtypes"
@@ -57,7 +56,7 @@ func open(kafkaURL string, tlsConfig *tls.Config) (*conn, error) {
 	dialer := &kafka.Dialer{
 		Timeout:   3 * time.Second,
 		DualStack: true, // IPv4 and IPv6
-		TLS: tlsConfig,
+		TLS:       tlsConfig,
 	}
 	c, err := dialer.Dial("tcp", kafkaURL)
 	if err != nil {

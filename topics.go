@@ -16,7 +16,7 @@ import (
 // The configuration can't be altered currently, because we want to avoid conflicts
 // by different services creating the same topic
 func EnsureTopicExists(ctx context.Context, kafkaURL string, tlsConfig *tls.Config, topicConfig kafka.TopicConfig) error {
-	ctxTimeout, _ := context.WithTimeout(ctx, 1 * time.Second)
+	ctxTimeout, _ := context.WithTimeout(ctx, 1 * time.Minute)
 	for {
 		err := ensureTopicExists(kafkaURL, tlsConfig, topicConfig)
 		if err != nil {

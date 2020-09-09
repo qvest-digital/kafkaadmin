@@ -14,10 +14,14 @@ import (
 // if it doesn't exist, it creates it with the default configuration
 // The configuration can't be altered currently, because we want to avoid conflicts
 // by different services creating the same topic
-func EnsureTopicExists(ctx context.Context, kafkaURL string, tlsConfig *tls.Config, topicConfig kafka.TopicConfig) error {
+func EnsureTopicExists(ctx context.Context, kafkaURL string, tlsConfig *tls.Config, topicName string) error {
+	return EnsureTopicExistsWithConfig(ctx, kafkaURL, tlsConfig, DefaultConfig(topicName))
+}
+
+func EnsureTopicExistsWithConfig(ctx context.Context, kafkaURL string, tlsConfig *tls.Config, topicConfig kafka.TopicConfig) error {
 	ctxTimeout, _ := context.WithTimeout(ctx, 1 * time.Minute)
 	for {
-		err := ensureTopicExists(kafkaURL, tlsConfig, topicConfig)
+		err := ensureTopicExistsWithConfig(kafkaURL, tlsConfig, topicConfig)
 		if err == nil || ctxTimeout.Err() != nil {
 			return err
 		}
@@ -39,7 +43,7 @@ func DefaultConfig(topicName string) kafka.TopicConfig {
 	}
 }
 
-func ensureTopicExists(kafkaURL string, tlsConfig *tls.Config, topicConfig kafka.TopicConfig) error {
+func ensureTopicExistsWithConfig(kafkaURL string, tlsConfig *tls.Config, topicConfig kafka.TopicConfig) error {
 	conn, err := open(kafkaURL, tlsConfig)
 
 	if err != nil {

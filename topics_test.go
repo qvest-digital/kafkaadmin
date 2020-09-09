@@ -21,7 +21,7 @@ func TestTopicCreation(t *testing.T) {
 	config := DefaultConfig(topic)
 	config.ReplicationFactor = 1
 
-	err := EnsureTopicExists(ctx, "localhost:9092", nil, config)
+	err := EnsureTopicExistsWithConfig(ctx, "localhost:9092", nil, config)
 
 	assert.Nil(t, err)
 
@@ -50,6 +50,6 @@ func TestTopicCreation(t *testing.T) {
 	assert.Equal(t, "compact", configResources[0].Config["cleanup.policy"].Value)
 
 	// ensure it still works if topic is present
-	err = EnsureTopicExists(ctx, "localhost:9092", nil, config)
+	err = EnsureTopicExistsWithConfig(ctx, "localhost:9092", nil, config)
 	assert.Nil(t, err)
 }

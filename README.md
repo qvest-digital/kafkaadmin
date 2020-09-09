@@ -22,7 +22,7 @@ git submodule add https://b11pgitlab.bankelf.de/smive/kafkaadmin.git ./internal/
 In code you can use it like this:
 
 ```
-err := kafkaadmin.EnsureTopicExists(ctx, zookeeperURL, kafkaURL, topicName)
+err := kafkaadmin.EnsureTopicExists(ctx, kafkaURL, tlsConfig, name)
 if err != nil {
 	return fmt.Errorf("ensuring topic %q failed: %w", topicName, err)
 }

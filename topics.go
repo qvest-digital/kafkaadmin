@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"time"
 
 	"github.com/fvosberg/errtypes"
@@ -41,20 +40,17 @@ func DefaultConfig(topicName string) kafka.TopicConfig {
 }
 
 func ensureTopicExists(kafkaURL string, tlsConfig *tls.Config, topicConfig kafka.TopicConfig) error {
-	logrus.Info("open")
 	conn, err := open(kafkaURL, tlsConfig)
 
 	if err != nil {
 		return fmt.Errorf("connection to Kafka failed: %w", err)
 	}
 
-	logrus.Info("createTopic")
 	err = conn.conn.CreateTopics(topicConfig)
 	if err != nil {
 		return fmt.Errorf("creation of topic failed: %w", err)
 	}
 
-	logrus.Info("waitForTopicExists")
 	err = conn.waitForTopicExists(topicConfig.Topic)
 	if err != nil {
 		return fmt.Errorf("waiting for topic creation failed: %w", err)

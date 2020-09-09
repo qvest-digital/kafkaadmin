@@ -3,7 +3,7 @@ module github.com/tarent/kafkaadmin
 go 1.13
 
 require (
-	github.com/confluentinc/confluent-kafka-go v1.4.2 // indirect
+	github.com/confluentinc/confluent-kafka-go v1.4.2
 	github.com/fvosberg/errtypes v0.0.0-20190318091206-e95b29c1c67c
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect

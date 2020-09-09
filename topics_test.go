@@ -2,9 +2,9 @@ package kafkaadmin
 
 import (
 	"context"
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -13,6 +13,7 @@ import (
 
 // before running test start local kafka at localhost:9092
 func TestTopicCreation(t *testing.T) {
+
 	ctx := context.Background()
 
 	rand.Seed(time.Now().UnixNano())

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"time"
 
 	"github.com/fvosberg/errtypes"
@@ -14,33 +15,50 @@ import (
 // if it doesn't exist, it creates it with the default configuration
 // The configuration can't be altered currently, because we want to avoid conflicts
 // by different services creating the same topic
-func EnsureTopicExists(ctx context.Context, kafkaURL string, tlsConfig *tls.Config, name string) error {
+func EnsureTopicExists(ctx context.Context, kafkaURL string, tlsConfig *tls.Config, topicConfig kafka.TopicConfig) error {
+	ctxTimeout, _ := context.WithTimeout(ctx, 1 * time.Second)
 	for {
-		err := ensureTopicExists(kafkaURL, tlsConfig, name, 32)
-		if err == nil || ctx.Err() != nil {
+		err := ensureTopicExists(kafkaURL, tlsConfig, topicConfig)
+		if err != nil {
+			logrus.Infof("could not create topic %s: %s", topicConfig.Topic, err)
+		}
+		if err == nil || ctxTimeout.Err() != nil {
 			return err
 		}
+		time.Sleep(500 * time.Millisecond)
 	}
 }
 
-func ensureTopicExists(kafkaURL string, tlsConfig *tls.Config, name string, numPartitions int) error {
+func DefaultConfig(topicName string) kafka.TopicConfig {
+	return kafka.TopicConfig{
+		Topic:             topicName,
+		ReplicationFactor: 3,
+		NumPartitions:     32,
+		ConfigEntries: []kafka.ConfigEntry{
+			{
+				ConfigName:  "cleanup.policy",
+				ConfigValue: "compact",
+			},
+		},
+	}
+}
+
+func ensureTopicExists(kafkaURL string, tlsConfig *tls.Config, topicConfig kafka.TopicConfig) error {
+	logrus.Info("open")
 	conn, err := open(kafkaURL, tlsConfig)
+
 	if err != nil {
 		return fmt.Errorf("connection to Kafka failed: %w", err)
 	}
-	err = conn.hasTopic(name)
-	if err == nil {
-		return nil
-	} else if err != nil && !errtypes.IsNotFound(err) {
-		return fmt.Errorf("topic existence check failed: %w", err)
-	}
 
-	err = conn.createTopic(name, numPartitions)
+	logrus.Info("createTopic")
+	err = conn.conn.CreateTopics(topicConfig)
 	if err != nil {
 		return fmt.Errorf("creation of topic failed: %w", err)
 	}
 
-	err = conn.waitForTopicExists(name)
+	logrus.Info("waitForTopicExists")
+	err = conn.waitForTopicExists(topicConfig.Topic)
 	if err != nil {
 		return fmt.Errorf("waiting for topic creation failed: %w", err)
 	}
@@ -76,20 +94,6 @@ func (c *conn) hasTopic(name string) error {
 		return errtypes.NewNotFound("topic doesn't exist")
 	}
 	return nil
-}
-
-func (c *conn) createTopic(name string, numPartitions int) error {
-	return c.conn.CreateTopics(kafka.TopicConfig{
-		Topic:             name,
-		ReplicationFactor: 3,
-		NumPartitions:     numPartitions,
-		ConfigEntries: []kafka.ConfigEntry{
-			{
-				ConfigName:  "cleanup.policy",
-				ConfigValue: "compact",
-			},
-		},
-	})
 }
 
 func (c *conn) waitForTopicExists(name string) error {

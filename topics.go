@@ -19,9 +19,6 @@ func EnsureTopicExists(ctx context.Context, kafkaURL string, tlsConfig *tls.Conf
 	ctxTimeout, _ := context.WithTimeout(ctx, 1 * time.Minute)
 	for {
 		err := ensureTopicExists(kafkaURL, tlsConfig, topicConfig)
-		if err != nil {
-			logrus.Infof("could not create topic %s: %s", topicConfig.Topic, err)
-		}
 		if err == nil || ctxTimeout.Err() != nil {
 			return err
 		}

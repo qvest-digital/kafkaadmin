@@ -12,7 +12,7 @@ repository_and_service_tests:
     GOROOT: "/usr/lib/go"
     GOPATH: "/go"
   before_script:
-    - apk update && apk add bash git make musl-dev go gcc libc-dev # py-pip python-dev libffi-dev openssl-dev gcc libc-dev
+    - apk update && apk add bash git make musl-dev go gcc libc-dev librdkafka # py-pip python-dev libffi-dev openssl-dev gcc libc-dev
     #- pip install docker-compose
     - export PATH="/go/bin:$PATH"
   script:

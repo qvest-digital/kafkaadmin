@@ -11,9 +11,8 @@ repository_and_service_tests:
   variables:
     GOROOT: "/usr/lib/go"
     GOPATH: "/go"
-    CGO_ENABLED: 1
   before_script:
-    - apk update && apk add bash git make musl-dev go # py-pip python-dev libffi-dev openssl-dev gcc libc-dev
+    - apk update && apk add bash git make musl-dev go gcc libc-dev # py-pip python-dev libffi-dev openssl-dev gcc libc-dev
     #- pip install docker-compose
     - export PATH="/go/bin:$PATH"
   script:

@@ -110,6 +110,8 @@ github.com/stretchr/testify v1.6.1 h1:hDPOHmpOpP40lSULcqw7IrRb/u7w6RpDC9399XyoNd
 github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/testcontainers/testcontainers-go v0.7.0 h1:IaAsq5JY49GhDgCUKY87mo6JeOLOwp321iEP/SQjJKE=
 github.com/testcontainers/testcontainers-go v0.7.0/go.mod h1:4dloDPrC94+8ebXA+Iei3Jy+gxF6uHQssJkB3mlP9Rg=
+github.com/tmstff/kafka-testing-go v0.1.5 h1:Jjtmfc3MqxZo3Scx3Wlz1q4Hid89bTzrynWRbFvRlKg=
+github.com/tmstff/kafka-testing-go v0.1.5/go.mod h1:5C8Un9I1OgVIc3dQGlK/wJQ2JUpEV+fDYyTnGuG32ZM=
 github.com/ugorji/go v1.1.7/go.mod h1:kZn38zHttfInRq0xu/PH0az30d+z6vm202qpg1oXVMw=
 github.com/ugorji/go/codec v1.1.7/go.mod h1:Ax+UKWsSmolVDwsd+7N3ZtXu+yMGCf907BLYF3GoBXY=
 github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c h1:u40Z8hqBAAQyv+vATcGgV0YCnDjqSL7/q/JyPhhJSPk=

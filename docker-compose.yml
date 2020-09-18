@@ -22,7 +22,7 @@ services:
       - kafka-net
     environment:
       KAFKA_BROKER_ID: 1
-      #KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false' # TODO make replicationFactor configurable for services and set to 1 in docker-compose
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: ${KAFKA_AUTO_CREATE_TOPICS_ENABLE}
       KAFKA_DELETE_TOPIC_ENABLE: 'true'
       KAFKA_AUTO_LEADER_REBALANCE_ENABLE: 'true'
       KAFKA_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka:29092,LISTENER_DOCKER_EXTERNAL://0.0.0.0:9092

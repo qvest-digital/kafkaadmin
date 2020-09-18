@@ -22,7 +22,7 @@ func TestTopicCreation(t *testing.T) {
 
 	ctx := context.Background()
 
-	kafkaUrl, terminateKafka, err := StartKafkaContainer(ctx)
+	kafkaUrl, terminateKafka, err := StartKafkaWithEnv(ctx, map[string]string{"KAFKA_AUTO_CREATE_TOPICS_ENABLE": "false"})
 	if err != nil {
 		assert.Fail(t, err.Error())
 	} else {
@@ -64,7 +64,7 @@ func TestTopicCreation(t *testing.T) {
 	assert.Equal(t, "compact", configResources[0].Config["cleanup.policy"].Value)
 
 	// ensure it still works if topic is present
-	err = EnsureTopicExistsWithConfig(ctx, "localhost:9092", nil, config)
+	err = EnsureTopicExistsWithConfig(ctx, kafkaUrl, nil, config)
 	assert.Nil(t, err)
 }
 
@@ -76,15 +76,23 @@ func (g *TestLogConsumer) Accept(l testcontainers.Log) {
 	logrus.Infof("%s: %s", g.containerName, string(l.Content))
 }
 
+// deprecated
 func StartKafkaContainer(ctx context.Context) (kafkaUrl string, terminateFunction func(context.Context) error, err error) {
+	return StartKafkaWithEnv(ctx, map[string]string{})
+}
 
+func StartKafka(ctx context.Context) (kafkaUrl string, terminateFunction func(context.Context) error, err error) {
+	return StartKafkaWithEnv(ctx, map[string]string{})
+}
+
+func StartKafkaWithEnv(ctx context.Context, env map[string]string) (kafkaUrl string, terminateFunction func(context.Context) error, err error) {
 	var containerHost string
 	var kafkaPortExpositionHost string
 	if val, exists := os.LookupEnv("HOST_IP"); exists {
 		containerHost = val
 		kafkaPortExpositionHost = val
 	} else {
-		containerHost = "localhost"//GetOutboundIP()
+		containerHost = GetOutboundIP()
 		kafkaPortExpositionHost = "0.0.0.0"
 	}
 
@@ -108,25 +116,34 @@ func StartKafkaContainer(ctx context.Context) (kafkaUrl string, terminateFunctio
 	composeFilePaths := []string{"docker-compose.yml"}
 
 	compose := testcontainers.NewLocalDockerCompose(composeFilePaths, identifier)
+
+	envWithDefaults := map[string]string{
+		"KAFKA_PORT_EXPOSITION":              portExpositionString,
+		"KAFKA_EXTERNAL_ADVERTISED_LISTENER": kafkaExternalAdvertisedListener,
+	}
+
+	for k,v := range env {
+		envWithDefaults[k] = v
+	}
+
 	execError := compose.
 		WithCommand([]string{"up", "-d"}).
-		WithEnv(map[string]string {
-			"KAFKA_PORT_EXPOSITION":              portExpositionString,
-			"KAFKA_EXTERNAL_ADVERTISED_LISTENER": kafkaExternalAdvertisedListener,
-		}).
+		WithEnv(envWithDefaults).
 		Invoke()
-	err = execError.Error
-	if err != nil {
-		logrus.Errorf("%s failed with\nstdout:\n%s\nstderr:\n%s", execError.Command, execError.Stdout.Error(), execError.Stderr.Error())
-		return "", nil, fmt.Errorf("could not run compose file: %v - %w", composeFilePaths, err)
+	if execError.Error != nil {
+		logrus.Errorf("%s failed with\nstdout:\n%v\nstderr:\n%v", execError.Command, execError.Stdout, execError.Stderr)
+		return "", nil, fmt.Errorf("could not run compose file: %v - %w", composeFilePaths, execError.Error)
 	}
 
 	logrus.Infof("kafka started at %s", kafkaExternalAdvertisedListener)
 
 	return kafkaExternalAdvertisedListener, func(ctx context.Context) error {
 		execError := compose.Down()
-		logrus.Errorf("%s failed with\nstdout:\n%s\nstderr:\n%s", execError.Command, execError.Stdout.Error(), execError.Stderr.Error())
-		return fmt.Errorf("'docker-compose down' failed for compose file: %v - %w", composeFilePaths, err)
+		if execError.Error != nil {
+			logrus.Errorf("%s failed with\nstdout:\n%v\nstderr:\n%v", execError.Command, execError.Stdout, execError.Stderr)
+			return fmt.Errorf("'docker-compose down' failed for compose file: %v - %w", composeFilePaths, err)
+		}
+		return nil
 	}, nil
 }
 

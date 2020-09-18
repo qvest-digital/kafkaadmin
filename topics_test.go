@@ -2,19 +2,32 @@ package kafkaadmin
 
 import (
 	"context"
+	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/testcontainers/testcontainers-go"
+	"log"
 	"math/rand"
+	"net"
+	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
 
-// before running test start local kafka at localhost:9092
 func TestTopicCreation(t *testing.T) {
 
 	ctx := context.Background()
+
+	kafkaUrl, terminateKafka, err := StartKafkaContainer(ctx)
+	if err != nil {
+		assert.Fail(t, err.Error())
+	} else {
+		defer terminateKafka(ctx)
+	}
 
 	rand.Seed(time.Now().UnixNano())
 	topic := strconv.FormatUint(rand.Uint64(), 10)
@@ -22,12 +35,12 @@ func TestTopicCreation(t *testing.T) {
 	config := DefaultConfig(topic)
 	config.ReplicationFactor = 1
 
-	err := EnsureTopicExistsWithConfig(ctx, "localhost:9092", nil, config)
+	err = EnsureTopicExistsWithConfig(ctx, kafkaUrl, nil, config)
 
 	assert.Nil(t, err)
 
 	adminClient, err := kafka.NewAdminClient(&kafka.ConfigMap{
-		"bootstrap.servers": "localhost:9092",
+		"bootstrap.servers": kafkaUrl,
 	})
 
 	assert.Nil(t, err, "could create adminClient")
@@ -53,4 +66,130 @@ func TestTopicCreation(t *testing.T) {
 	// ensure it still works if topic is present
 	err = EnsureTopicExistsWithConfig(ctx, "localhost:9092", nil, config)
 	assert.Nil(t, err)
+}
+
+type TestLogConsumer struct {
+	containerName string
+}
+
+func (g *TestLogConsumer) Accept(l testcontainers.Log) {
+	logrus.Infof("%s: %s", g.containerName, string(l.Content))
+}
+
+func StartKafkaContainer(ctx context.Context) (kafkaUrl string, terminateFunction func(context.Context) error, err error) {
+
+	var containerHost string
+	var kafkaPortExpositionHost string
+	if val, exists := os.LookupEnv("HOST_IP"); exists {
+		containerHost = val
+		kafkaPortExpositionHost = val
+	} else {
+		containerHost = "localhost"//GetOutboundIP()
+		kafkaPortExpositionHost = "0.0.0.0"
+	}
+
+	hostPortInt, err := GetFreePort(kafkaPortExpositionHost)
+	if err != nil {
+		return "", nil, err
+	}
+
+	logrus.Infof("containerHost: %s, kafkaPortExpositionHost: %s ", containerHost, kafkaPortExpositionHost)
+
+	hostPort := fmt.Sprintf("%d", hostPortInt)
+	kafkaExternalAdvertisedListener := containerHost + ":" + hostPort
+	logrus.Debugf("kafkaExternalAdvertisedListener: %s", kafkaExternalAdvertisedListener)
+
+	// hostPort:containerPort/protocol
+	portExpositionString := kafkaPortExpositionHost + ":" + hostPort + ":9092"
+	logrus.Debugf("kafka port exposition: %s", portExpositionString)
+
+	identifier := strings.ToLower(uuid.New().String())
+
+	composeFilePaths := []string{"docker-compose.yml"}
+
+	compose := testcontainers.NewLocalDockerCompose(composeFilePaths, identifier)
+	execError := compose.
+		WithCommand([]string{"up", "-d"}).
+		WithEnv(map[string]string {
+			"KAFKA_PORT_EXPOSITION":              portExpositionString,
+			"KAFKA_EXTERNAL_ADVERTISED_LISTENER": kafkaExternalAdvertisedListener,
+		}).
+		Invoke()
+	err = execError.Error
+	if err != nil {
+		logrus.Errorf("%s failed with\nstdout:\n%s\nstderr:\n%s", execError.Command, execError.Stdout.Error(), execError.Stderr.Error())
+		return "", nil, fmt.Errorf("could not run compose file: %v - %w", composeFilePaths, err)
+	}
+
+	logrus.Infof("kafka started at %s", kafkaExternalAdvertisedListener)
+
+	return kafkaExternalAdvertisedListener, func(ctx context.Context) error {
+		execError := compose.Down()
+		logrus.Errorf("%s failed with\nstdout:\n%s\nstderr:\n%s", execError.Command, execError.Stdout.Error(), execError.Stderr.Error())
+		return fmt.Errorf("'docker-compose down' failed for compose file: %v - %w", composeFilePaths, err)
+	}, nil
+}
+
+// inspired by https://github.com/phayes/freeport
+func GetFreePort(host string) (int, error) {
+	hostWithPort := fmt.Sprintf("%s:0", host)
+	addr, err := net.ResolveTCPAddr("tcp", hostWithPort)
+	if err != nil {
+		fmt.Printf("could not resolve %s: %s", hostWithPort, err)
+		return GetFreePortFallback(host)
+	}
+
+	l, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		fmt.Printf("could not listen to %s: %s", hostWithPort, err)
+		return GetFreePortFallback(host)
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port, nil
+}
+
+func GetFreePortFallback(host string) (int, error) {
+	port := getRandomPort()
+	for isOpen(host, port) {
+		port = getRandomPort()
+	}
+	return port, nil
+}
+
+func getRandomPort() int {
+	rand.Seed(time.Now().UnixNano())
+	min := 49152
+	max := 65535
+	return rand.Intn(max - min) + min
+}
+
+func isOpen(host string, port int) bool {
+	return raw_connect(host, strconv.Itoa(port)) == nil
+}
+
+// see https://stackoverflow.com/questions/56336168/golang-check-tcp-port-open
+func raw_connect(host string, port string) error {
+	timeout := time.Second
+	hostAndPort := net.JoinHostPort(host, port)
+	conn, err := net.DialTimeout("tcp", hostAndPort, timeout)
+	if err != nil {
+		fmt.Printf("could not connect to %s: %s - (which is good, because we are looking for an unused port ;-) )", hostAndPort, err)
+		return err
+	}
+	defer conn.Close()
+	return nil
+}
+
+// Get preferred outbound ip of this machine
+// see https://stackoverflow.com/questions/23558425/how-do-i-get-the-local-ip-address-in-go
+func GetOutboundIP() string {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP.String()
 }

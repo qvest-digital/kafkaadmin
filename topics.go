@@ -10,26 +10,29 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
-// EnsureTopicExists checks if the topic with the given name is missing
+// EnsureCompactedTopicExists checks if the topic with the given name is missing
 // if it doesn't exist, it creates it with the default configuration
 // The configuration can't be altered currently, because we want to avoid conflicts
 // by different services creating the same topic
-func EnsureTopicExists(ctx context.Context, kafkaURL string, tlsConfig *tls.Config, topicName string) error {
-	return EnsureTopicExistsWithConfig(ctx, kafkaURL, tlsConfig, DefaultConfig(topicName))
+func EnsureCompactedTopicExists(ctx context.Context, kafkaURL string, tlsConfig *tls.Config, topicName string) error {
+	return EnsureTopicExistsWithConfig(ctx, kafkaURL, tlsConfig, CompactedTopicConfig(topicName))
 }
 
 func EnsureTopicExistsWithConfig(ctx context.Context, kafkaURL string, tlsConfig *tls.Config, topicConfig kafka.TopicConfig) error {
-	ctxTimeout, _ := context.WithTimeout(ctx, 1 * time.Minute)
 	for {
-		err := ensureTopicExistsWithConfig(kafkaURL, tlsConfig, topicConfig)
-		if err == nil || ctxTimeout.Err() != nil {
-			return err
+		select {
+		case err := ensureTopicExistsWithConfig(kafkaURL, tlsConfig, topicConfig):
+			if err == nil {
+				return err
+			}
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
 }
 
-func DefaultConfig(topicName string) kafka.TopicConfig {
+func CompactedTopicConfig(topicName string) kafka.TopicConfig {
 	return kafka.TopicConfig{
 		Topic:             topicName,
 		ReplicationFactor: 3,

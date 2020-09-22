@@ -2,14 +2,14 @@ package kafkaadmin
 
 import (
 	"context"
-	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
-	"github.com/tmstff/kafka-testing-go"
 	"math/rand"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/stretchr/testify/assert"
+	kafkatesting "github.com/tmstff/kafka-testing-go"
 )
 
 func TestTopicCreation(t *testing.T) {
@@ -26,7 +26,7 @@ func TestTopicCreation(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	topic := strconv.FormatUint(rand.Uint64(), 10)
 
-	config := DefaultConfig(topic)
+	config := CompactedTopicConfig(topic)
 	config.ReplicationFactor = 1
 
 	err = EnsureTopicExistsWithConfig(ctx, kafkaUrl, nil, config)
@@ -48,9 +48,9 @@ func TestTopicCreation(t *testing.T) {
 	assert.NotNil(t, configResources)
 
 	for _, cr := range configResources {
-		logrus.Infof("config resource %s", cr)
+		t.Logf("config resource %s", cr)
 		for _, c := range cr.Config {
-			logrus.Infof("config %s", c)
+			t.Logf("config %s", c)
 		}
 	}
 

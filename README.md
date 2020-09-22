@@ -13,7 +13,7 @@ partitions, as this is a sane default for our platform.
 In code you can use it like this:
 
 ```
-err := kafkaadmin.EnsureTopicExists(ctx, kafkaURL, tlsConfig, topicName)
+err := kafkaadmin.EnsureCompactedTopicExists(ctx, kafkaURL, tlsConfig, topicName)
 if err != nil {
 	return fmt.Errorf("ensuring topic %q failed: %w", topicName, err)
 }

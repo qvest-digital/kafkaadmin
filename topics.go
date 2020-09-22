@@ -19,9 +19,15 @@ func EnsureCompactedTopicExists(ctx context.Context, kafkaURL string, tlsConfig 
 }
 
 func EnsureTopicExistsWithConfig(ctx context.Context, kafkaURL string, tlsConfig *tls.Config, topicConfig kafka.TopicConfig) error {
+	errs := make(chan error, 1)
 	for {
+		go func() {
+			err := ensureTopicExistsWithConfig(kafkaURL, tlsConfig, topicConfig)
+			errs <- err
+		}()
+
 		select {
-		case err := ensureTopicExistsWithConfig(kafkaURL, tlsConfig, topicConfig):
+		case err := <-errs:
 			if err == nil {
 				return err
 			}

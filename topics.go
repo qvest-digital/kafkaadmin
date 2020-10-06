@@ -97,15 +97,16 @@ func open(kafkaURL string, tlsConfig *tls.Config) (*conn, error) {
 	if err != nil {
 		return nil, fmt.Errorf("determining controller: %w", err)
 	}
-	c.Close()
 
 	controllerUrl := fmt.Sprintf("%s:%d", broker.Host, broker.Port)
 	if controllerUrl != kafkaURL {
+		c.Close()
 		c, err = dialer.Dial("tcp", controllerUrl)
 		if err != nil {
 			return nil, err
 		}
 	}
+	
 	return &conn{c}, nil
 }
 

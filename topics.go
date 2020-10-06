@@ -20,6 +20,7 @@ func EnsureCompactedTopicExists(ctx context.Context, kafkaURL string, tlsConfig 
 
 func EnsureTopicExistsWithConfig(ctx context.Context, kafkaURL string, tlsConfig *tls.Config, topicConfig kafka.TopicConfig) error {
 	errs := make(chan error, 1)
+	var lastErr error
 	for {
 		go func() {
 			err := ensureTopicExistsWithConfig(kafkaURL, tlsConfig, topicConfig)
@@ -31,7 +32,11 @@ func EnsureTopicExistsWithConfig(ctx context.Context, kafkaURL string, tlsConfig
 			if err == nil {
 				return err
 			}
+			lastErr = err
 		case <-ctx.Done():
+			if lastErr != nil {
+				return fmt.Errorf("%s: %w", lastErr, ctx.Err())
+			}
 			return ctx.Err()
 		}
 		time.Sleep(500 * time.Millisecond)

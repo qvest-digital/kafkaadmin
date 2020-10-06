@@ -87,9 +87,24 @@ func open(kafkaURL string, tlsConfig *tls.Config) (*conn, error) {
 		DualStack: true, // IPv4 and IPv6
 		TLS:       tlsConfig,
 	}
+
 	c, err := dialer.Dial("tcp", kafkaURL)
 	if err != nil {
 		return nil, err
+	}
+
+	broker, err := c.Controller()
+	if err != nil {
+		return nil, fmt.Errorf("determining controller: %w", err)
+	}
+	c.Close()
+
+	controllerUrl := fmt.Sprintf("%s:%d", broker.Host, broker.Port)
+	if controllerUrl != kafkaURL {
+		c, err = dialer.Dial("tcp", controllerUrl)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &conn{c}, nil
 }

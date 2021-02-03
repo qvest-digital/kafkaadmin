@@ -18,6 +18,14 @@ func EnsureCompactedTopicExists(ctx context.Context, kafkaURL string, tlsConfig 
 	return EnsureTopicExistsWithConfig(ctx, kafkaURL, tlsConfig, CompactedTopicConfig(topicName))
 }
 
+// EnsureTopicExistsWithCleanupPolicyDelete checks if the topic with the given name is missing
+// if it doesn't exist, it creates it with the default configuration
+// The configuration can't be altered currently, because we want to avoid conflicts
+// by different services creating the same topic
+func EnsureTopicExistsWithCleanupPolicyDelete(ctx context.Context, kafkaURL string, tlsConfig *tls.Config, topicName string) error {
+	return EnsureTopicExistsWithConfig(ctx, kafkaURL, tlsConfig, TopicConfigCleanupPolicyDelete(topicName))
+}
+
 func EnsureTopicExistsWithConfig(ctx context.Context, kafkaURL string, tlsConfig *tls.Config, topicConfig kafka.TopicConfig) error {
 	errs := make(chan error, 1)
 	var lastErr error
@@ -40,6 +48,20 @@ func EnsureTopicExistsWithConfig(ctx context.Context, kafkaURL string, tlsConfig
 			return ctx.Err()
 		}
 		time.Sleep(500 * time.Millisecond)
+	}
+}
+
+func TopicConfigCleanupPolicyDelete(topicName string) kafka.TopicConfig {
+	return kafka.TopicConfig{
+		Topic:             topicName,
+		ReplicationFactor: 3,
+		NumPartitions:     32,
+		ConfigEntries: []kafka.ConfigEntry{
+			{
+				ConfigName:  "cleanup.policy",
+				ConfigValue: "delete",
+			},
+		},
 	}
 }
 
@@ -106,7 +128,7 @@ func open(kafkaURL string, tlsConfig *tls.Config) (*conn, error) {
 			return nil, err
 		}
 	}
-	
+
 	return &conn{c}, nil
 }
 

@@ -61,6 +61,10 @@ func TopicConfigCleanupPolicyDelete(topicName string) kafka.TopicConfig {
 				ConfigName:  "cleanup.policy",
 				ConfigValue: "delete",
 			},
+			{
+				ConfigName:  "retention.ms",
+				ConfigValue: "1209600000",
+			},
 		},
 	}
 }

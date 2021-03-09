@@ -18,7 +18,7 @@ func TestTopicCreation(t *testing.T) {
 
 	kafkaUrl, terminateKafka, err := kafkatesting.StartKafkaWithEnv(ctx, map[string]string{"KAFKA_AUTO_CREATE_TOPICS_ENABLE": "true"})
 	if err != nil {
-		assert.Fail(t, err.Error())
+		assert.FailNow(t, err.Error())
 	} else {
 		defer terminateKafka(ctx)
 	}
@@ -50,7 +50,7 @@ func TestTopicCreation(t *testing.T) {
 	for _, cr := range configResources {
 		t.Logf("config resource %s", cr)
 		for _, c := range cr.Config {
-			t.Logf("config %s", c)
+			t.Logf("config %s = %s", c.Name, c.Value)
 		}
 	}
 
@@ -60,4 +60,11 @@ func TestTopicCreation(t *testing.T) {
 	// ensure it still works if topic is present
 	err = EnsureTopicExistsWithConfig(ctx, kafkaUrl, nil, config)
 	assert.Nil(t, err)
+
+	// ensure it fails with different config
+	differentConfig := TopicConfigCleanupPolicyDelete(topic)
+	differentConfig.ReplicationFactor = 1
+	err = EnsureTopicExistsWithConfig(ctx, kafkaUrl, nil, differentConfig)
+	assert.NotNil(t, err)
+	assert.Equal(t, err.Error(), "creating a topic with cleanup.policy=delete failed because there already was one with cleanup.policy=compact")
 }

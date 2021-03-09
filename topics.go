@@ -31,7 +31,7 @@ func EnsureTopicExistsWithConfig(ctx context.Context, kafkaURL string, tlsConfig
 	var lastErr error
 	for {
 		go func() {
-			err := ensureTopicExistsWithConfig(kafkaURL, tlsConfig, topicConfig)
+			err := ensureTopicExistsWithConfig(ctx, kafkaURL, tlsConfig, topicConfig)
 			errs <- err
 		}()
 
@@ -83,11 +83,32 @@ func CompactedTopicConfig(topicName string) kafka.TopicConfig {
 	}
 }
 
-func ensureTopicExistsWithConfig(kafkaURL string, tlsConfig *tls.Config, topicConfig kafka.TopicConfig) error {
+func ensureTopicExistsWithConfig(ctx context.Context, kafkaURL string, tlsConfig *tls.Config, topicConfig kafka.TopicConfig) error {
 	conn, err := open(kafkaURL, tlsConfig)
 
 	if err != nil {
 		return fmt.Errorf("connection to Kafka failed: %w", err)
+	}
+
+	client := kafka.Client{conn.conn.RemoteAddr(), 10 * time.Second, nil}
+	description, err := client.DescribeConfigs(ctx, &kafka.DescribeConfigsRequest{conn.conn.RemoteAddr(), []kafka.DescribeConfigRequestResource{{kafka.ResourceTypeTopic, topicConfig.Topic, nil}}, false, false})
+	if err != nil {
+		return fmt.Errorf("querying of topic config failed: %w", err)
+	}
+	described := description.Resources[0]
+	fmt.Print(described)
+	if described.Error == nil {
+		//topic already exists, check if cleanup policy is the same
+		existingPolicy := findDescribeConfig(&described, "cleanup.policy")
+		wantedPolicy := findTopicConfig(&topicConfig, "cleanup.policy")
+
+		if wantedPolicy != nil && existingPolicy.ConfigValue != wantedPolicy.ConfigValue {
+			return fmt.Errorf("creating a topic with cleanup.policy=%v failed because there already was one with cleanup.policy=%v", existingPolicy.ConfigValue, existingPolicy.ConfigValue)
+		}
+		return nil
+	}
+	if described.Error != kafka.UnknownTopicOrPartition {
+		return fmt.Errorf("querying of topic config failed: %w", described.Error)
 	}
 
 	err = conn.conn.CreateTopics(topicConfig)
@@ -165,4 +186,22 @@ func (c *conn) waitForTopicExists(name string) error {
 func isUnknownTopicOrPartitionError(err error) bool {
 	v, ok := err.(kafka.Error)
 	return ok && v == kafka.UnknownTopicOrPartition
+}
+
+func findDescribeConfig(holder *kafka.DescribeConfigResponseResource, name string) *kafka.DescribeConfigResponseConfigEntry {
+	for _, config := range holder.ConfigEntries {
+		if config.ConfigName == name {
+			return &config
+		}
+	}
+	return nil
+}
+
+func findTopicConfig(holder *kafka.TopicConfig, name string) *kafka.ConfigEntry {
+	for _, config := range holder.ConfigEntries {
+		if config.ConfigName == name {
+			return &config
+		}
+	}
+	return nil
 }
